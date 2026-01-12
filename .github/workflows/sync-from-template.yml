@@ -42,10 +42,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
+
           TEMPLATE_DIR="template"
           CHANGED_FILES=()
-          
+
           # Files and directories to sync
           SYNC_PATTERNS=(
             ".github/instructions/"
@@ -57,7 +57,7 @@ jobs:
             ".prettierrc"
             "ruff.toml"
           )
-          
+
           # Files to never overwrite (local overrides)
           EXCLUDE_PATTERNS=(
             "*.local.instructions.md"
@@ -66,18 +66,18 @@ jobs:
             "CHANGELOG.md"
             "action.yml"
           )
-          
+
           echo "::group::Syncing files from template"
-          
+
           for pattern in "${SYNC_PATTERNS[@]}"; do
             if [[ -d "$TEMPLATE_DIR/$pattern" ]]; then
               # Directory - copy all files recursively
               echo "Syncing directory: $pattern"
               mkdir -p "$pattern"
-              
+
               while IFS= read -r -d '' file; do
                 relative_path="${file#$TEMPLATE_DIR/}"
-                
+
                 # Check if file should be excluded
                 should_exclude=false
                 for exclude in "${EXCLUDE_PATTERNS[@]}"; do
@@ -86,12 +86,12 @@ jobs:
                     break
                   fi
                 done
-                
+
                 if [[ "$should_exclude" == "true" ]]; then
                   echo "  Skipping (excluded): $relative_path"
                   continue
                 fi
-                
+
                 # Copy if different or doesn't exist
                 if [[ ! -f "$relative_path" ]] || ! cmp -s "$file" "$relative_path"; then
                   echo "  Updating: $relative_path"
@@ -100,11 +100,11 @@ jobs:
                   CHANGED_FILES+=("$relative_path")
                 fi
               done < <(find "$TEMPLATE_DIR/$pattern" -type f -print0)
-              
+
             elif [[ -f "$TEMPLATE_DIR/$pattern" ]]; then
               # Single file
               echo "Syncing file: $pattern"
-              
+
               # Check if file should be excluded
               should_exclude=false
               for exclude in "${EXCLUDE_PATTERNS[@]}"; do
@@ -113,12 +113,12 @@ jobs:
                   break
                 fi
               done
-              
+
               if [[ "$should_exclude" == "true" ]]; then
                 echo "  Skipping (excluded): $pattern"
                 continue
               fi
-              
+
               if [[ ! -f "$pattern" ]] || ! cmp -s "$TEMPLATE_DIR/$pattern" "$pattern"; then
                 echo "  Updating: $pattern"
                 mkdir -p "$(dirname "$pattern")"
@@ -127,16 +127,16 @@ jobs:
               fi
             fi
           done
-          
+
           echo "::endgroup::"
-          
+
           # Check if there are changes
           if [[ ${#CHANGED_FILES[@]} -eq 0 ]]; then
             echo "No changes detected"
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
+
           echo "Changed files:"
           printf '%s\n' "${CHANGED_FILES[@]}"
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
@@ -148,14 +148,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           git add .
           git commit -m "chore(sync): sync files from jft-github-actions template
-          
+
           Synced ${{ steps.sync.outputs.changed_count }} file(s) from template repository.
-          
+
           This is an automated sync from the jft-github-actions template repository."
-          
+
           git push
 
       - name: Summary
