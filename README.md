@@ -1,5 +1,5 @@
 <!-- file: README.md -->
-<!-- version: 1.0.0 -->
+<!-- version: 1.1.0 -->
 <!-- guid: a1b2c3d4-e5f6-7890-abcd-ef1234567890 -->
 
 # jft-github-actions
@@ -35,21 +35,43 @@ ruff.toml               # Python linting
 
 ## 🔄 Synchronization
 
-Action repositories automatically sync files from this template using GitHub Actions:
+**Pull-based sync**: Each action repository pulls files from this template and commits locally.
 
-- **Schedule**: Daily at 6am UTC
-- **Manual trigger**: Via workflow_dispatch
+- **Schedule**: Daily at 6am UTC (via each repo's workflow)
+- **Manual trigger**: Run `sync-from-template` workflow in any action repo
 - **Files synced**: Instructions, agents, configs, issue templates
+- **Workflow**: `.github/workflows/sync-from-template.yml` (included in template)
+
+### How It Works
+
+1. Each action repo has the `sync-from-template.yml` workflow
+2. Workflow checks out both the action repo and this template
+3. Compares files and copies any that changed
+4. Commits changes directly to the action repo
+5. Each repo manages its own sync independently
 
 ### Synced Files
 
-All files in this repository (except README.md) are synchronized to action repos.
+The following patterns are synced from template:
 
-### Local Overrides
+- `.github/instructions/` - All instruction files
+- `.github/agents/` - All agent definitions
+- `.github/ISSUE_TEMPLATE/` - Issue templates
+- `.github/dependabot.yml` - Dependency configuration
+- `.pre-commit-config.yaml` - Pre-commit hooks
+- `.yamllint` - YAML linting rules
+- `.prettierrc` - Code formatting rules
+- `ruff.toml` - Python linting configuration
 
-For repository-specific instructions that should NOT be overwritten:
-- Use naming pattern: `*.local.instructions.md`
-- Example: `python.local.instructions.md`
+### Files Excluded from Sync
+
+The following files are NEVER overwritten:
+
+- `*.local.instructions.md` - Repository-specific instructions
+- `.github/workflows/*` - Repository workflows (except sync-from-template.yml)
+- `README.md` - Repository documentation
+- `CHANGELOG.md` - Repository changelog
+- `action.yml` - Action definition
 
 ## 🚀 Using This Template
 
@@ -62,9 +84,13 @@ For repository-specific instructions that should NOT be overwritten:
 
 ### For Existing Repositories
 
-1. Add the sync workflow to your repo
-2. Run manual sync to pull latest files
-3. Review and commit changes
+The sync workflow is automatically distributed via this template. To add it:
+
+1. Copy `.github/workflows/sync-from-template.yml` from this template
+2. Commit to your action repo
+3. Run workflow manually first time: `gh workflow run sync-from-template.yml`
+4. Review and commit the synced files
+5. Future syncs happen automatically daily at 6am UTC
 
 ## 📝 Updating Standards
 
