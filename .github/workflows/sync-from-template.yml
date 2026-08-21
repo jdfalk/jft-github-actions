@@ -1,5 +1,5 @@
 # file: .github/workflows/sync-from-template.yml
-# version: 1.1.0
+# version: 1.2.0
 # guid: 8f9e0a1b-2c3d-4e5f-6a7b-8c9d0e1f2a3b
 # last-edited: 2026-08-21
 name: Sync from Template
@@ -145,10 +145,14 @@ jobs:
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
           echo "changed_count=${#CHANGED_FILES[@]}" >> "$GITHUB_OUTPUT"
 
-      - name: Commit and push changes
+      - name: Commit and open a sync PR
         if: steps.sync.outputs.has_changes == 'true' && inputs.dry_run != true
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGED_COUNT: ${{ steps.sync.outputs.changed_count }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -162,14 +166,43 @@ jobs:
           # checkout before staging; the sync step has already copied out of it.
           rm -rf template
 
+          # Open a PR rather than pushing to main. Classic branch protection on
+          # these repos requires the `set-auto-merge` status check, and that job
+          # lives in auto-merge.yml, which only triggers on `pull_request`. A bot
+          # pushing straight to main therefore can NEVER satisfy it:
+          #   remote: error: GH006: Protected branch update failed
+          #   remote: - Required status check "set-auto-merge" is expected.
+          # That rejection is why the sync failed every run from 2026-04-26 to
+          # 2026-06-13; an unrelated checkout crash then masked it until
+          # 2026-08-21. Going through a PR needs no protection change and matches
+          # what auto-merge.yml was already built to do.
+          BRANCH="chore/sync-from-template"
+          git checkout -b "$BRANCH"
+
           git add .
           git commit -m "chore(sync): sync files from jft-github-actions template
 
-          Synced ${{ steps.sync.outputs.changed_count }} file(s) from template repository.
+          Synced ${CHANGED_COUNT} file(s) from template repository.
 
           This is an automated sync from the jft-github-actions template repository."
 
-          git push
+          # Force-push a single rolling branch so repeated syncs supersede each
+          # other instead of piling up one stale PR per day.
+          git push -f -u origin "$BRANCH"
+
+          # Reuse the open PR if one is already waiting; only label it `auto-merge`
+          # so set-auto-merge actually runs and the required check can report.
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+            gh pr create \
+              --head "$BRANCH" \
+              --title "chore(sync): sync ${CHANGED_COUNT} file(s) from the template" \
+              --body "Automated sync from the \`jft-github-actions\` template repository.
+
+          Opened as a PR rather than pushed to \`main\`: branch protection requires the \`set-auto-merge\` check, which only runs on \`pull_request\`, so a direct push is rejected with GH006." \
+              --label auto-merge
+          else
+            echo "sync PR already open for $BRANCH — updated it in place"
+          fi
 
       - name: Summary
         shell: bash
