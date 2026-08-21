@@ -1,6 +1,7 @@
 # file: .github/workflows/sync-from-template.yml
-# version: 1.0.2
+# version: 1.1.0
 # guid: 8f9e0a1b-2c3d-4e5f-6a7b-8c9d0e1f2a3b
+# last-edited: 2026-08-21
 name: Sync from Template
 
 on:
@@ -150,6 +151,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # The template repo is checked out into ./template as scratch space.
+          # It is a git repo in its own right, so `git add .` records it as a
+          # gitlink (mode 160000) instead of ignoring it. Nothing ever adds a
+          # matching entry to .gitmodules, so the next run's
+          # `actions/checkout` with submodules:recursive dies with
+          #   fatal: No url found for submodule path 'template' in .gitmodules
+          # That is exactly how 14 gha-* repos broke. Delete the scratch
+          # checkout before staging; the sync step has already copied out of it.
+          rm -rf template
 
           git add .
           git commit -m "chore(sync): sync files from jft-github-actions template
