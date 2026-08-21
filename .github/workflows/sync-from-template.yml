@@ -1,5 +1,5 @@
 # file: .github/workflows/sync-from-template.yml
-# version: 1.2.0
+# version: 1.3.0
 # guid: 8f9e0a1b-2c3d-4e5f-6a7b-8c9d0e1f2a3b
 # last-edited: 2026-08-21
 name: Sync from Template
@@ -190,8 +190,25 @@ jobs:
           # other instead of piling up one stale PR per day.
           git push -f -u origin "$BRANCH"
 
+          # The `auto-merge` label MUST exist before it can be applied: `gh pr
+          # create --label` hard-fails on an unknown label, which would turn a
+          # working sync into a differently-broken one. Measured 2026-08-21: the
+          # label was absent from every falkcorp/gha-* repo checked. Create it
+          # idempotently rather than assuming it is there.
+          gh label create auto-merge \
+            --color 0e8a16 \
+            --description "Enable auto-merge for this PR" 2>/dev/null \
+            || echo "auto-merge label already exists"
+
           # Reuse the open PR if one is already waiting; only label it `auto-merge`
           # so set-auto-merge actually runs and the required check can report.
+          #
+          # This label is not cosmetic. `set-auto-merge` is a REQUIRED status
+          # check whose job is gated on `if: contains(labels, 'auto-merge')`, so
+          # on an unlabelled PR it is SKIPPED — and a skipped required check
+          # never satisfies branch protection. That is why every Dependabot PR in
+          # these repos has sat BLOCKED for months. Labelling on creation is what
+          # makes the required check actually run and report.
           if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
             gh pr create \
               --head "$BRANCH" \
